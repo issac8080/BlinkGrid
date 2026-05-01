@@ -1,3 +1,9 @@
+/**
+ * Socket.io browser client (not served as /socket.io/socket.io.js on static hosts like Vercel).
+ * Pinned version matches server dependency.
+ */
+import { io as ioClient } from "https://esm.sh/socket.io-client@4.8.1";
+
 function createNoopAudio() {
   const noop = () => {};
   const asyncNoop = async () => {};
@@ -233,13 +239,8 @@ const views = {
 
 function ensureSocket() {
   if (socket) return socket;
-  const ioFn = globalThis.io;
-  if (typeof ioFn !== "function") {
-    console.error("Socket.io client not loaded");
-    return null;
-  }
   const { url, opts } = buildSocketIoClientOptions();
-  socket = url ? ioFn(url, opts) : ioFn(opts);
+  socket = url ? ioClient(url, opts) : ioClient(opts);
   socket.on("connect", () => {
     lastSocketConnectError = null;
     mySocketId = socket.id;
@@ -480,7 +481,8 @@ document.getElementById("modal-name-go")?.addEventListener("click", () => {
     if (!connected) {
       if (errEl) {
         errEl.textContent =
-          lastSocketConnectError || "Could not connect to the game server. Check your network and try again.";
+          lastSocketConnectError ||
+          "Could not connect to the game server. On Vercel, set meta blinkgrid-socket-url to your Node API (see README).";
         errEl.removeAttribute("hidden");
       }
       return;
@@ -523,7 +525,13 @@ document.getElementById("btn-join-room")?.addEventListener("click", () => {
   const name = document.getElementById("join-name")?.value?.trim() || "Player";
   const code = document.getElementById("join-code")?.value?.trim() || "";
   const s = ensureSocket();
-  if (!s) return;
+  if (!s) {
+    if (err) {
+      err.textContent = "Could not load multiplayer client. Refresh the page.";
+      err.removeAttribute("hidden");
+    }
+    return;
+  }
   s.emit("room:join", { code, name }, (res) => {
     if (!res?.ok) {
       if (err) {

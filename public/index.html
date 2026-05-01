@@ -7,7 +7,7 @@
     <link rel="icon" type="image/png" href="/logo.png" />
     <link rel="apple-touch-icon" href="/logo.png" />
     <meta name="theme-color" content="#0f172a" />
-    <!-- Optional production overrides: set content when the page origin is not the Socket.IO server (e.g. static CDN + API host). Path default is /socket.io -->
+    <!-- When the UI is static (e.g. Vercel) but the game runs on another host, set blinkgrid-socket-url to that API origin (no trailing slash). Example: https://your-app.up.railway.app -->
     <meta name="blinkgrid-socket-url" content="" />
     <meta name="blinkgrid-socket-path" content="" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -288,7 +288,6 @@
       </div>
     </div>
 
-    <script src="/socket.io/socket.io.js"></script>
     <script type="module" src="/js/app.js"></script>
   </body>
 </html>

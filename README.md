@@ -68,6 +68,17 @@ Set **`NODE_ENV=production`**. Your host almost always sets **`PORT`** — the s
 
 If the browser loads the UI from a **different origin** than the API (unusual for this single-server app), set **`ALLOWED_ORIGINS`** to a comma-separated list (e.g. `https://myapp.onrender.com`).
 
+### Vercel (or any static file host)
+
+Vercel does **not** run the long-lived Node + Socket.io process for this repo by default. If you deploy **only** the `public/` folder as a static site:
+
+1. Run the real game server somewhere that supports Node (e.g. **Railway**, **Render**, **Fly.io**) and note its public HTTPS origin.
+2. In `public/index.html`, set the meta tag **`blinkgrid-socket-url`** to that origin (no path, no trailing slash), for example:  
+   `<meta name="blinkgrid-socket-url" content="https://your-api.up.railway.app" />`
+3. On the API host, set **`ALLOWED_ORIGINS`** (or **`CORS_ORIGIN`**) to include your Vercel URL (e.g. `https://your-app.vercel.app`) so the browser is allowed to open the WebSocket.
+
+The browser loads the Socket.io **client** from a CDN (`esm.sh` in `app.js`); it no longer depends on `/socket.io/socket.io.js` from Express, so buttons are not stuck on “client not loaded”. If you skip step 2, the page will still try to connect to the Vercel hostname itself, where there is no game server — use the meta tag or deploy the **full** app on a Node host instead.
+
 | Command | What it does |
 | --- | --- |
 | `npm start` / `npm run dev` | Run the game server |
