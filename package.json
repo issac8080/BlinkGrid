@@ -6,6 +6,7 @@
   "main": "server.js",
   "scripts": {
     "build": "npm test",
+    "vercel:build": "node scripts/vercel-static-build.cjs",
     "start": "node server.js",
     "dev": "node server.js",
     "test": "jest",

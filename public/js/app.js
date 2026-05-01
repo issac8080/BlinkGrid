@@ -35,14 +35,50 @@ let lastSocketConnectError = null;
 let mySocketId = null;
 
 function readBlinkgridMeta(name) {
+  if (name === "blinkgrid-socket-url") {
+    try {
+      const q = new URLSearchParams(location.search).get("socketUrl");
+      if (q) {
+        const dec = decodeURIComponent(q.trim());
+        if (dec.startsWith("http://") || dec.startsWith("https://")) {
+          return dec.replace(/\/+$/, "");
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    const injected = String(globalThis.__BLINKGRID_SOCKET_URL__ ?? "").trim();
+    if (injected) {
+      return injected.replace(/\/+$/, "");
+    }
+  }
   const el = document.querySelector(`meta[name="${name}"]`);
   return (el?.getAttribute("content") ?? "").trim();
+}
+
+function setNetStatusBanner(show, message) {
+  const el = document.getElementById("net-banner");
+  if (!el) return;
+  if (show && message) {
+    el.textContent = message;
+    el.removeAttribute("hidden");
+  } else {
+    el.setAttribute("hidden", "");
+    el.textContent = "";
+  }
 }
 
 function buildSocketIoClientOptions() {
   const url = readBlinkgridMeta("blinkgrid-socket-url");
   const pathRaw = readBlinkgridMeta("blinkgrid-socket-path");
-  const opts = { transports: ["websocket", "polling"] };
+  const opts = {
+    transports: ["websocket", "polling"],
+    reconnection: true,
+    reconnectionAttempts: 15,
+    reconnectionDelay: 600,
+    reconnectionDelayMax: 10000,
+    timeout: 20000,
+  };
   if (pathRaw) {
     let p = pathRaw.startsWith("/") ? pathRaw : `/${pathRaw}`;
     p = p.replace(/\/+$/, "");
@@ -244,6 +280,14 @@ function ensureSocket() {
   socket.on("connect", () => {
     lastSocketConnectError = null;
     mySocketId = socket.id;
+    setNetStatusBanner(false, "");
+  });
+  socket.on("disconnect", (reason) => {
+    if (reason === "io client disconnect") return;
+    const v = getActiveView();
+    if (v === "game" || v === "lobby" || v === "join" || v === "results") {
+      setNetStatusBanner(true, "Connection lost — reconnecting…");
+    }
   });
   socket.on("connect_error", (err) => {
     lastSocketConnectError = err?.message || String(err);
@@ -519,32 +563,44 @@ document.getElementById("modal-name-go")?.addEventListener("click", () => {
 
 /* ---------- Join ---------- */
 document.getElementById("btn-join-room")?.addEventListener("click", () => {
-  void ensureAudioUnlocked();
-  const err = document.getElementById("join-error");
-  err?.setAttribute("hidden", "");
-  const name = document.getElementById("join-name")?.value?.trim() || "Player";
-  const code = document.getElementById("join-code")?.value?.trim() || "";
-  const s = ensureSocket();
-  if (!s) {
-    if (err) {
-      err.textContent = "Could not load multiplayer client. Refresh the page.";
-      err.removeAttribute("hidden");
-    }
-    return;
-  }
-  s.emit("room:join", { code, name }, (res) => {
-    if (!res?.ok) {
+  void (async () => {
+    await ensureAudioUnlocked();
+    const err = document.getElementById("join-error");
+    err?.setAttribute("hidden", "");
+    const name = document.getElementById("join-name")?.value?.trim() || "Player";
+    const code = document.getElementById("join-code")?.value?.trim() || "";
+    const s = ensureSocket();
+    if (!s) {
       if (err) {
-        err.textContent = res?.error || "Could not join";
+        err.textContent = "Could not load multiplayer client. Refresh the page.";
         err.removeAttribute("hidden");
       }
       return;
     }
-    if (typeof res.yourId === "string") mySocketId = res.yourId;
-    roomState = res.room;
-    showView("lobby");
-    renderLobby();
-  });
+    const connected = await waitForSocketReady(s);
+    if (!connected) {
+      if (err) {
+        err.textContent =
+          lastSocketConnectError ||
+          "Could not connect to the game server. On Vercel, set BLINKGRID_SOCKET_URL at build time or meta blinkgrid-socket-url (see README).";
+        err.removeAttribute("hidden");
+      }
+      return;
+    }
+    s.emit("room:join", { code, name }, (res) => {
+      if (!res?.ok) {
+        if (err) {
+          err.textContent = res?.error || "Could not join";
+          err.removeAttribute("hidden");
+        }
+        return;
+      }
+      if (typeof res.yourId === "string") mySocketId = res.yourId;
+      roomState = res.room;
+      showView("lobby");
+      renderLobby();
+    });
+  })();
 });
 
 /* ---------- Lobby ---------- */
@@ -1228,162 +1284,4 @@ if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", maybeAutoTutorial);
 } else {
   maybeAutoTutorial();
-}
-
-/* ---------- First-time tutorial (~20s, skippable) ---------- */
-const TUTORIAL_STORAGE_KEY = "blinkgridTutorialV1";
-const TUTORIAL_TOTAL_MS = 20_000;
-const TUTORIAL_STEP_MS = 4_000;
-const TUTORIAL_STEPS = [
-  {
-    title: "Welcome to Blink Grid",
-    body: "Fast multiplayer rounds on a shared board. Tap glowing tiles to claim them and score — speed and combos matter.",
-  },
-  {
-    title: "Play now",
-    body: "Create a room, pick your name, then share the short room code so friends can join from their phones or desktops.",
-  },
-  {
-    title: "Join with code",
-    body: "Have a code from a host? Use Join with code, enter it, and you will drop into their lobby when the match is set up.",
-  },
-  {
-    title: "How, settings, about",
-    body: "Use the bottom bar for the rules, sound toggle, and credits. The host chooses grid size and round length before everyone readies up.",
-  },
-  {
-    title: "In the match",
-    body: "Tiles blink then disappear — tap while they are active to claim them. The round ends when time runs out or every tile is filled. Highest score wins.",
-  },
-];
-
-/** @type {number[]} */
-let tutorialTimers = [];
-/** @type {((e: KeyboardEvent) => void) | null} */
-let tutorialKeydownHandler = null;
-
-function markTutorialSeen() {
-  try {
-    globalThis.localStorage?.setItem(TUTORIAL_STORAGE_KEY, "1");
-  } catch {
-    /* quota / private mode */
-  }
-}
-
-function dismissTutorial() {
-  const overlay = document.getElementById("tutorial-overlay");
-  const fill = document.getElementById("tutorial-progress-fill");
-  for (const id of tutorialTimers) window.clearTimeout(id);
-  tutorialTimers = [];
-  if (tutorialKeydownHandler) {
-    document.removeEventListener("keydown", tutorialKeydownHandler);
-    tutorialKeydownHandler = null;
-  }
-  if (fill) {
-    fill.classList.remove("tutorial-overlay__progress-fill--run");
-    fill.style.animation = "none";
-    fill.style.transform = "scaleX(0)";
-  }
-  overlay?.setAttribute("hidden", "");
-  document.body.classList.remove("tutorial-active");
-  markTutorialSeen();
-}
-
-function renderTutorialStep(index) {
-  const step = TUTORIAL_STEPS[index];
-  if (!step) return;
-  const titleEl = document.getElementById("tutorial-title");
-  const bodyEl = document.getElementById("tutorial-body");
-  const badgeEl = document.getElementById("tutorial-step-label");
-  const dotsEl = document.getElementById("tutorial-dots");
-  if (titleEl) titleEl.textContent = step.title;
-  if (bodyEl) bodyEl.textContent = step.body;
-  if (badgeEl) badgeEl.textContent = `Step ${index + 1} of ${TUTORIAL_STEPS.length}`;
-  if (dotsEl) {
-    dotsEl.innerHTML = "";
-    for (let i = 0; i < TUTORIAL_STEPS.length; i++) {
-      const d = document.createElement("span");
-      d.className = "tutorial-overlay__dot" + (i === index ? " tutorial-overlay__dot--active" : "");
-      dotsEl.appendChild(d);
-    }
-  }
-}
-
-function startFirstTimeTutorial() {
-  const overlay = document.getElementById("tutorial-overlay");
-  const fill = document.getElementById("tutorial-progress-fill");
-  const skipBtn = document.getElementById("tutorial-skip");
-  if (!overlay || !fill) return;
-  if (document.body.classList.contains("tutorial-active")) return;
-
-  for (const id of tutorialTimers) window.clearTimeout(id);
-  tutorialTimers = [];
-  overlay.removeAttribute("hidden");
-  document.body.classList.add("tutorial-active");
-
-  fill.classList.remove("tutorial-overlay__progress-fill--run");
-  fill.style.removeProperty("animation");
-  fill.style.transform = "scaleX(0)";
-  fill.style.setProperty("--tutorial-duration", `${TUTORIAL_TOTAL_MS}ms`);
-  window.requestAnimationFrame(() => {
-    void fill.offsetWidth;
-    fill.classList.add("tutorial-overlay__progress-fill--run");
-  });
-
-  for (let i = 0; i < TUTORIAL_STEPS.length; i++) {
-    const delay = i * TUTORIAL_STEP_MS;
-    tutorialTimers.push(
-      window.setTimeout(() => {
-        renderTutorialStep(i);
-      }, delay),
-    );
-  }
-  tutorialTimers.push(
-    window.setTimeout(() => {
-      dismissTutorial();
-    }, TUTORIAL_TOTAL_MS),
-  );
-
-  renderTutorialStep(0);
-  skipBtn?.focus();
-
-  tutorialKeydownHandler = (e) => {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      dismissTutorial();
-    }
-  };
-  document.addEventListener("keydown", tutorialKeydownHandler);
-}
-
-function maybeStartFirstTimeTutorial() {
-  let seen = false;
-  try {
-    seen = globalThis.localStorage?.getItem(TUTORIAL_STORAGE_KEY) === "1";
-  } catch {
-    return;
-  }
-  if (seen) return;
-  if (getActiveView() !== "landing") return;
-  if (!document.getElementById("view-landing")?.classList.contains("view--active")) return;
-
-  window.setTimeout(() => {
-    try {
-      if (globalThis.localStorage?.getItem(TUTORIAL_STORAGE_KEY) === "1") return;
-    } catch {
-      return;
-    }
-    if (getActiveView() !== "landing") return;
-    startFirstTimeTutorial();
-  }, 450);
-}
-
-document.getElementById("tutorial-skip")?.addEventListener("click", () => {
-  dismissTutorial();
-});
-
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", maybeStartFirstTimeTutorial);
-} else {
-  maybeStartFirstTimeTutorial();
 }
