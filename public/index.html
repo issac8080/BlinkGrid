@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Blink Grid</title>
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="apple-touch-icon" href="/logo.png" />
+    <meta name="theme-color" content="#0f172a" />
+    <!-- Optional production overrides: set content when the page origin is not the Socket.IO server (e.g. static CDN + API host). Path default is /socket.io -->
+    <meta name="blinkgrid-socket-url" content="" />
+    <meta name="blinkgrid-socket-path" content="" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <div id="app" class="app">
+      <!-- Landing -->
+      <section id="view-landing" class="view view--active">
+        <header class="topbar">
+          <div class="logo" aria-label="Blink Grid">
+            <img class="logo__img" src="/logo.png" width="180" height="72" alt="Blink Grid" />
+          </div>
+          <button type="button" class="icon-btn" id="btn-sound" title="Sound" aria-pressed="false">
+            <span class="icon-sound-on" aria-hidden="true">🔊</span>
+            <span class="icon-sound-off" aria-hidden="true">🔇</span>
+          </button>
+        </header>
+        <p class="tagline">Tap Fast. Claim Tiles. Win Together!</p>
+        <div class="hero-brand">
+          <img class="hero-brand__img" src="/logo.png" width="280" height="112" alt="" aria-hidden="true" />
+        </div>
+        <div class="stack stack--cta">
+          <button type="button" class="btn btn--gradient" id="btn-play-now">PLAY NOW</button>
+          <button type="button" class="btn btn--outline" id="btn-join-code">JOIN WITH CODE</button>
+        </div>
+        <footer class="dock">
+          <button type="button" class="dock__btn" id="btn-how" title="How to play">
+            <span aria-hidden="true">📖</span><small>How</small>
+          </button>
+          <button type="button" class="dock__btn" id="btn-settings" title="Settings">
+            <span aria-hidden="true">⚙️</span><small>Settings</small>
+          </button>
+          <button type="button" class="dock__btn" id="btn-about" title="About">
+            <span aria-hidden="true">ℹ️</span><small>About</small>
+          </button>
+        </footer>
+        <p class="dev-credit">
+          developed by Issac Sunny ·
+          <a href="https://www.linkedin.com/in/issac-sunny/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+          ·
+          <a href="https://github.com/issac8080" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </p>
+      </section>
+
+      <!-- Join -->
+      <section id="view-join" class="view">
+        <header class="topbar topbar--back">
+          <button type="button" class="text-btn" data-back="landing">← Back</button>
+          <img class="topbar__logo" src="/logo.png" width="120" height="48" alt="Blink Grid" />
+        </header>
+        <div class="join-hero">
+          <div class="avatar-pile" aria-hidden="true">
+            <span class="avatar-pile__c a1"></span>
+            <span class="avatar-pile__c a2"></span>
+            <span class="avatar-pile__c a3"></span>
+            <span class="avatar-pile__c a4"></span>
+            <span class="avatar-pile__c a5"></span>
+          </div>
+          <h1 class="h1">Join a room</h1>
+          <p class="muted">Enter the code your host shared.</p>
+        </div>
+        <label class="field">
+          <span class="field__label">Your name</span>
+          <input type="text" id="join-name" maxlength="16" placeholder="Player" autocomplete="nickname" />
+        </label>
+        <label class="field">
+          <span class="field__label">Room code</span>
+          <input type="text" id="join-code" maxlength="8" placeholder="X7G2K" autocomplete="off" class="input-code" />
+        </label>
+        <p id="join-error" class="error" hidden></p>
+        <button type="button" class="btn btn--gradient btn--block" id="btn-join-room">JOIN ROOM</button>
+      </section>
+
+      <!-- Lobby (create flow uses same view) -->
+      <section id="view-lobby" class="view">
+        <header class="lobby-head">
+          <img class="lobby-head__logo" src="/logo.png" width="140" height="56" alt="Blink Grid" />
+          <span class="pill">LOBBY</span>
+          <div class="room-code-row">
+            <span class="room-code" id="lobby-code">------</span>
+            <button type="button" class="icon-btn" id="btn-copy-code" title="Copy code">📋</button>
+            <button type="button" class="icon-btn" id="btn-copy-invite" title="Copy invite link">🔗</button>
+          </div>
+          <p class="muted small" id="lobby-you"></p>
+        </header>
+        <div class="lobby-tools">
+          <span class="muted small">Grid</span>
+          <div class="seg seg--grid" id="grid-seg" role="group" aria-label="Board size">
+            <button type="button" data-size="5" class="seg__btn seg__btn--active">5×5</button>
+            <button type="button" data-size="6" class="seg__btn">6×6</button>
+            <button type="button" data-size="7" class="seg__btn">7×7</button>
+            <button type="button" data-size="10" class="seg__btn">10×10</button>
+            <button type="button" data-size="16" class="seg__btn">16×16</button>
+          </div>
+          <p class="grid-seg-hint small" id="grid-seg-hint" aria-live="polite"></p>
+          <span class="muted small">Round time</span>
+          <div class="seg seg--time" id="time-seg" role="group" aria-label="Round length">
+            <button type="button" data-duration-ms="90000" class="seg__btn">Easy · 1:30</button>
+            <button type="button" data-duration-ms="60000" class="seg__btn seg__btn--active">Medium · 1:00</button>
+            <button type="button" data-duration-ms="30000" class="seg__btn">Hard · 0:30</button>
+          </div>
+          <p class="grid-seg-hint small" id="time-seg-hint" aria-live="polite"></p>
+        </div>
+        <ul class="player-list" id="lobby-players"></ul>
+        <p class="muted small" style="text-align: center; margin: 0 0 12px">
+          1–4 humans: bots fill the match to 6. With 5–6 humans, no bots.
+        </p>
+        <div class="lobby-actions">
+          <button type="button" class="btn btn--secondary btn--block" id="btn-ready">READY</button>
+          <button type="button" class="btn btn--gradient btn--block" id="btn-start" disabled>START GAME</button>
+          <button type="button" class="text-btn" id="btn-leave-lobby">Leave room</button>
+        </div>
+      </section>
+
+      <!-- How to play -->
+      <section id="view-how" class="view">
+        <header class="topbar topbar--back">
+          <button type="button" class="text-btn" data-back="landing">← Back</button>
+          <img class="topbar__logo" src="/logo.png" width="120" height="48" alt="Blink Grid" />
+        </header>
+        <h1 class="h1">How to play</h1>
+        <ol class="how-list">
+          <li>
+            Each blink telegraphs for a split second (dim ring) before you can tap — watch for it, then react.
+          </li>
+          <li>Tiles blink on the grid at random. Keep your eyes on the board! Host can pick 5×5 up to 16×16 — bigger boards run longer.</li>
+          <li>Tap a blinking tile before it vanishes to claim it and score.</li>
+          <li>Special tiles: ⚡ double, 💣 minus one, ❄️ freeze rivals, 🔥 streak combo, 🌀 shuffle owners, 🧲 magnet vacuum.</li>
+          <li>Chain quick claims within half a second for combo bonus points. Empty seats can be filled by friendly bots.</li>
+          <li>When time runs out, the highest score wins.</li>
+        </ol>
+        <button type="button" class="btn btn--gradient btn--block" data-back="landing">GOT IT!</button>
+      </section>
+
+      <!-- Settings -->
+      <section id="view-settings" class="view">
+        <header class="topbar topbar--back">
+          <button type="button" class="text-btn" data-back="landing">← Back</button>
+          <img class="topbar__logo" src="/logo.png" width="120" height="48" alt="Blink Grid" />
+        </header>
+        <h1 class="h1">Settings</h1>
+        <label class="field row">
+          <span>Sound effects</span>
+          <input type="checkbox" id="set-sound" checked />
+        </label>
+        <label class="field row">
+          <span>Tile shape hints (color-blind friendly)</span>
+          <input type="checkbox" id="set-patterns" />
+        </label>
+        <p class="muted small">Tip: keep sound low for office play. Shape hints add stripes and borders so specials are easier to tell apart.</p>
+        <button type="button" class="text-btn" id="btn-replay-tutorial">Replay intro tour</button>
+      </section>
+
+      <!-- About -->
+      <section id="view-about" class="view">
+        <header class="topbar topbar--back">
+          <button type="button" class="text-btn" data-back="landing">← Back</button>
+          <img class="topbar__logo" src="/logo.png" width="120" height="48" alt="Blink Grid" />
+        </header>
+        <h1 class="h1">About</h1>
+        <div class="about-brand">
+          <img class="about-brand__img" src="/logo.png" width="240" height="96" alt="Blink Grid" />
+        </div>
+        <p class="muted">
+          Blink Grid is a tiny real-time reaction game: shared grid, random blinks, first tap wins the tile. Built with
+          Node.js and Socket.io — no database, just in-memory fun.
+        </p>
+        <p class="dev-credit dev-credit--block">
+          developed by Issac Sunny<br />
+          <a href="https://www.linkedin.com/in/issac-sunny/" target="_blank" rel="noopener noreferrer">linkedin.com/in/issac-sunny</a>
+          ·
+          <a href="https://github.com/issac8080" target="_blank" rel="noopener noreferrer">github.com/issac8080</a>
+        </p>
+      </section>
+
+      <!-- Game -->
+      <section id="view-game" class="view view--game">
+        <header class="game-top">
+          <img class="game-top__logo" src="/logo.png" width="72" height="29" alt="Blink Grid" />
+          <div class="game-timer" id="game-timer">00:00</div>
+          <div class="game-meta"><span id="game-players-n">0</span> 👥</div>
+          <button type="button" class="icon-btn" id="btn-game-menu" title="Menu">☰</button>
+        </header>
+        <div class="game-body">
+          <aside class="scoreboard" id="scoreboard"></aside>
+          <div class="game-main">
+            <div id="game-toast" class="game-toast" hidden></div>
+            <div id="freeze-overlay" class="freeze-overlay" hidden>
+              <span class="freeze-overlay__title">FROZEN</span>
+              <span id="freeze-countdown" class="freeze-overlay__count" aria-live="polite"></span>
+            </div>
+            <div class="grid-wrap">
+              <div id="game-grid" class="grid" role="application" aria-label="Game grid"></div>
+            </div>
+            <div class="legend">
+              <span><span class="legend__dot legend__dot--zap"></span> Double</span>
+              <span><span class="legend__dot legend__dot--bomb"></span> Trap</span>
+              <span><span class="legend__dot legend__dot--ice"></span> Freeze</span>
+              <span><span class="legend__dot legend__dot--streak"></span> Streak</span>
+              <span><span class="legend__dot legend__dot--shuffle"></span> Shuffle</span>
+              <span><span class="legend__dot legend__dot--magnet"></span> Magnet</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Results -->
+      <section id="view-results" class="view">
+        <div class="results-hero">
+          <img class="results-hero__logo" src="/logo.png" width="160" height="64" alt="Blink Grid" />
+          <span class="confetti" aria-hidden="true">🎉</span>
+          <h1 class="h1 h1--center">GAME OVER!</h1>
+        </div>
+        <p class="results-tag" id="results-tag" hidden></p>
+        <div class="podium" id="podium"></div>
+        <div class="rematch-row">
+          <button type="button" class="btn btn--gradient btn--block" id="btn-rematch">REMATCH</button>
+          <p class="muted small rematch-row__hint" id="rematch-votes"></p>
+        </div>
+        <div class="stack">
+          <button type="button" class="btn btn--outline btn--block" id="btn-play-again">BACK TO LOBBY</button>
+        </div>
+      </section>
+
+      <!-- Name modal (play now) -->
+      <div id="modal-name" class="modal" hidden>
+        <div class="modal__card">
+          <img class="modal__logo" src="/logo.png" width="160" height="64" alt="Blink Grid" />
+          <h2 class="h2">Choose a name</h2>
+          <p id="modal-name-error" class="error" hidden></p>
+          <input type="text" id="create-name" maxlength="16" placeholder="Player" autocomplete="nickname" />
+          <div class="modal__actions">
+            <button type="button" class="text-btn" id="modal-name-cancel">Cancel</button>
+            <button type="button" class="btn btn--gradient" id="modal-name-go">Create room</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Game menu -->
+      <div id="modal-game-menu" class="modal" hidden>
+        <div class="modal__card">
+          <img class="modal__logo" src="/logo.png" width="140" height="56" alt="Blink Grid" />
+          <h2 class="h2">Menu</h2>
+          <button type="button" class="btn btn--dark btn--block" id="btn-forfeit">Leave match</button>
+          <button type="button" class="text-btn btn--block" id="modal-game-close">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- First-time guided tour (~20s, skippable); z-index above in-app modals -->
+    <div
+      id="tutorial-overlay"
+      class="tutorial-overlay"
+      hidden
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="tutorial-title"
+    >
+      <div class="tutorial-overlay__backdrop" aria-hidden="true"></div>
+      <div class="tutorial-overlay__card">
+        <div class="tutorial-overlay__top">
+          <span class="tutorial-overlay__badge" id="tutorial-step-label" aria-live="polite"></span>
+          <button type="button" class="text-btn tutorial-overlay__skip" id="tutorial-skip">Skip tour</button>
+        </div>
+        <div class="tutorial-overlay__progress" aria-hidden="true">
+          <div class="tutorial-overlay__progress-fill" id="tutorial-progress-fill"></div>
+        </div>
+        <h2 id="tutorial-title" class="tutorial-overlay__title"></h2>
+        <p id="tutorial-body" class="tutorial-overlay__body"></p>
+        <button type="button" class="btn btn--gradient tutorial-overlay__next" id="tutorial-next">Continue</button>
+        <div class="tutorial-overlay__dots" id="tutorial-dots" aria-hidden="true"></div>
+      </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="module" src="/js/app.js"></script>
+  </body>
+</html>
